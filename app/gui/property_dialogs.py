@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QFormLayout, QLineEdit, QDialogButtonBox, QTextEdit, QCheckBox, QPushButton, QHBoxLayout
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QFormLayout, QLineEdit, QDialogButtonBox, QTextEdit, QCheckBox, QPushButton, QHBoxLayout, QComboBox
 
 class NodePropertiesDialog(QDialog):
     def __init__(self, name, expected_result, is_initial, parent=None):
@@ -53,7 +53,7 @@ class NodePropertiesDialog(QDialog):
 
 
 class TransitionPropertiesDialog(QDialog):
-    def __init__(self, action, input_data, parent=None):
+    def __init__(self, action, input_data, trans_type="Neutral", parent=None):
         super().__init__(parent)
         self.setWindowTitle("Свойства перехода")
         self.delete_requested = False
@@ -70,8 +70,14 @@ class TransitionPropertiesDialog(QDialog):
         self.input_edit.setPlainText(str(input_data))
         self.input_edit.setMaximumHeight(100)
 
+        # Выбор типа перехода
+        self.type_combo = QComboBox()
+        self.type_combo.addItems(["Neutral", "Success", "Error"])
+        self.type_combo.setCurrentText(trans_type)
+
         form.addRow("Действие (Action):", self.action_edit)
         form.addRow("Входные данные (Input):", self.input_edit)
+        form.addRow("Тип перехода:", self.type_combo)
 
         layout.addLayout(form)
 
@@ -93,4 +99,4 @@ class TransitionPropertiesDialog(QDialog):
         self.accept()
 
     def get_values(self):
-        return self.action_edit.text(), self.input_edit.toPlainText(), self.delete_requested
+        return self.action_edit.text(), self.input_edit.toPlainText(), self.type_combo.currentText(), self.delete_requested

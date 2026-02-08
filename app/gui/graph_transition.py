@@ -1,6 +1,6 @@
 import math
-from PyQt6.QtWidgets import QGraphicsPathItem, QGraphicsRectItem, QGraphicsPolygonItem
-from PyQt6.QtGui import QPen, QColor, QPainterPath, QPolygonF, QBrush
+from PyQt6.QtWidgets import QGraphicsPathItem, QGraphicsRectItem, QGraphicsPolygonItem, QGraphicsTextItem
+from PyQt6.QtGui import QPen, QColor, QPainterPath, QPolygonF, QBrush, QTextOption
 from PyQt6.QtCore import QLineF, QPointF, Qt
 
 from .property_dialogs import TransitionPropertiesDialog
@@ -22,6 +22,19 @@ class GraphTransitionItem(QGraphicsPathItem):
         self.arrow_head.setBrush(QBrush(QColor("#555555")))
         self.arrow_head.setPen(QPen(QColor("#555555"), 1))
 
+        self.label = QGraphicsTextItem(self)
+        self.label.setDefaultTextColor(QColor("white"))
+        self.label.setTextWidth(150)
+        font = self.label.font()
+        font.setBold(True)
+        font.setPointSize(10)
+        option = QTextOption(Qt.AlignmentFlag.AlignCenter)
+        option.setWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
+        self.label.document().setDefaultTextOption(option)
+        self.label.setFont(font)
+        self.label.setZValue(15) # Поверх всего
+        self.update_label_text() # Установим текст из логики
+
         # Создаем якорь (точку изгиба)
         self.anchor = TransitionAnchor(self)
         
@@ -38,6 +51,24 @@ class GraphTransitionItem(QGraphicsPathItem):
             if self.scene():
                 self.scene().addItem(self.anchor)
         return super().itemChange(change, value)
+    
+    def update_label_text(self):
+        """Обновляет текст подписи на основе Action"""
+        action_text = self.logical_transition.action
+        # Если действие не ввели, показываем пустоту или "Action"
+        self.label.setPlainText(action_text if action_text != "Action" else "")
+
+    def refresh_style(self):
+        """Меняет цвет стрелки в зависимости от типа"""
+        trans_type = self.logical_transition.properties.get("type", "Neutral")
+        color = "#555555" # По умолчанию серый
+        if trans_type == "Success": color = "#27ae60" # Зеленый
+        if trans_type == "Error": color = "#c0392b"   # Красный
+        
+        pen = QPen(QColor(color), 2)
+        self.setPen(pen)
+        self.arrow_head.setBrush(QBrush(QColor(color)))
+        self.arrow_head.setPen(QPen(QColor(color), 1))
 
     def update_position(self):
         """Пересчет геометрии линии и наконечника"""
@@ -72,15 +103,24 @@ class GraphTransitionItem(QGraphicsPathItem):
 
         self.arrow_head.setPolygon(QPolygonF([e_point, p3, p4]))
 
+        label_rect = self.label.boundingRect()
+        self.label.setPos(
+            p_anchor.x() - label_rect.width() / 2, 
+            p_anchor.y() - label_rect.height() - 10  # На 10 пикселей выше якоря
+        )
+        
+        self.update_label_text()
+        self.refresh_style()
+
     def mouseDoubleClickEvent(self, event):
         current_action = self.logical_transition.action
         current_input = self.logical_transition.properties.get("input_data", "")
+        current_type = self.logical_transition.properties.get("type", "Neutral")
 
-        from .property_dialogs import TransitionPropertiesDialog
-        dialog = TransitionPropertiesDialog(current_action, current_input)
+        dialog = TransitionPropertiesDialog(current_action, current_input, current_type)
         
         if dialog.exec():
-            new_action, new_input, now_delete = dialog.get_values()
+            new_action, new_input, now_type, now_delete = dialog.get_values()
             
             if now_delete:
                 # Удаляем из логики
@@ -102,6 +142,9 @@ class GraphTransitionItem(QGraphicsPathItem):
             # Обновление данных
             self.logical_transition.action = new_action
             self.logical_transition.properties["input_data"] = new_input
+            self.logical_transition.properties["type"] = now_type
+            
+            self.update_position()
 
 class TransitionAnchor(QGraphicsRectItem):
     """Точка изгиба"""

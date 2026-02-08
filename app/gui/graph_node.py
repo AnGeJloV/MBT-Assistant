@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QGraphicsEllipseItem, QGraphicsTextItem, QInputDialog, QCheckBox
-from PyQt6.QtGui import QBrush, QColor
+from PyQt6.QtGui import QBrush, QColor, QTextOption
 from PyQt6.QtCore import Qt
 
 from ..core.graph import Node
@@ -27,17 +27,20 @@ class GraphNodeItem(QGraphicsEllipseItem):
         # Имя поверх кружка
         self.text_item = QGraphicsTextItem(self.logical_node.name, self)
         self.text_item.setDefaultTextColor(QColor("black"))
+        self.text_item.setTextWidth(90)
+        option = QTextOption(Qt.AlignmentFlag.AlignCenter)
+        option.setWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
+        self.text_item.document().setDefaultTextOption(option)
         self.update_text_position()
 
         self.setZValue(1) # Узлы на нижнем слое
 
     def update_text_position(self):
         """Центрирует текст внутри круга"""
-        text_rect = self.text_item.boundingRect()
-        node_rect = self.boundingRect()
+        rect = self.text_item.boundingRect()
         self.text_item.setPos(
-            (node_rect.width() - text_rect.width()) / 2,
-            (node_rect.height() - text_rect.height()) / 2
+            (100 - rect.width()) / 2,
+            (100 - rect.height()) / 2
         )
 
     def itemChange(self, change, value):

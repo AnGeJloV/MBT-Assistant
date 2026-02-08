@@ -19,7 +19,7 @@ class MainWindow(QMainWindow):
 
         # Настройка окна
         self.setWindowTitle("MBT-Assistant")
-        self.setGeometry(100, 100, 1200, 800)
+        self.setGeometry(100, 100, 1100, 700)
 
         # Создание холста для рисования
         self.scene = QGraphicsScene()
