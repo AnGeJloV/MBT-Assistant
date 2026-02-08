@@ -1,10 +1,11 @@
-from PyQt6.QtWidgets import QMainWindow, QGraphicsView, QGraphicsScene, QToolBar
+from PyQt6.QtWidgets import QMainWindow, QGraphicsView, QGraphicsScene, QToolBar, QMessageBox, QTextEdit, QDialog, QVBoxLayout
 from PyQt6.QtGui import QAction, QBrush, QColor
 from PyQt6.QtCore import Qt
 
 from ..core.graph import Graph
 from .graph_node import GraphNodeItem
 from .graph_transition import GraphTransitionItem
+from ..core.test_generator import TestGenerator
 
 class MainWindow(QMainWindow):
     """
@@ -59,6 +60,11 @@ class MainWindow(QMainWindow):
         self.link_action = QAction("Соединить", self)
         self.link_action.setCheckable(True) # Кнопка-"переключатель"
         toolbar.addAction(self.link_action)
+
+        # Кнопка для генерации тестов
+        gen_action = QAction("Генерировать тесты", self)
+        gen_action.triggered.connect(self.run_generation)
+        toolbar.addAction(gen_action)
 
     def add_state_node(self):
         """Метод-обработчик для добавления нового узла-состояния"""
@@ -132,3 +138,41 @@ class MainWindow(QMainWindow):
             source.transitions.append(visual_trans)
             target.transitions.append(visual_trans)
             print(f"Связь создана: {source.logical_node.name} -> {target.logical_node.name}")
+
+    def run_generation(self):
+        generator = TestGenerator(self.graph_model)
+        
+        # Проверяем наличие старта
+        if not generator.find_start_node():
+            QMessageBox.warning(self, "Ошибка", "Не найден начальный узел! Откройте свойства узла и поставьте галочку 'Начальное состояние'.")
+            return
+
+        # Генерируем пути
+        paths = generator.generate_all_paths()
+        test_cases = generator.format_test_cases(paths)
+
+        # Формируем текст для отображения (временно, пока нет вкладки Результаты)
+        result_text = ""
+        for test in test_cases:
+            result_text += f"=== ТЕСТ-КЕЙС №{test['id']} ===\n"
+            for j, step in enumerate(test['steps']):
+                result_text += f"Шаг {j+1}: {step['action']}\n"
+                result_text += f"   Ввод: {step['input']}\n"
+                result_text += f"   Ожидаемый результат: {step['expected']}\n"
+            result_text += "\n"
+
+        # Показываем результат в простом окне
+        self.show_results_popup(result_text)
+
+    def show_results_popup(self, text):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Сгенерированные тесты")
+        dialog.setMinimumSize(600, 400)
+        layout = QVBoxLayout(dialog)
+        
+        text_area = QTextEdit()
+        text_area.setPlainText(text)
+        text_area.setReadOnly(True)
+        
+        layout.addWidget(text_area)
+        dialog.exec()
