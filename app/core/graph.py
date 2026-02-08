@@ -58,6 +58,17 @@ class Graph:
             if t.source.id != node_id and t.target.id != node_id
         ]
 
+    def find_transition(self, source: Node, target: Node) -> Transition:
+        """Ищет существующий переход между двумя узлами"""
+        for t in self.transitions:
+            if t.source.id == source.id and t.target.id == target.id:
+                return t
+        return None
+
+    def delete_transition(self, trans_id: str):
+        """Удаляет конкретный переход по ID"""
+        self.transitions = [t for t in self.transitions if t.id != trans_id]
+
     def clear(self):
         """Очищает весь граф"""
         self.nodes = []
