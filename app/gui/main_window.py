@@ -68,6 +68,10 @@ class MainWindow(QMainWindow):
         # Создаем визуальное представление для этого узла
         visual_node = GraphNodeItem(logical_node)
 
+        if len(self.graph_model.nodes) == 1:
+            logical_node.properties["is_initial"] = True
+            visual_node.refresh_color()
+
         visual_node.mousePressEvent = lambda event: self.handle_node_click(visual_node, event)
         
         # Добавляем визуальный узел на сцену
@@ -79,21 +83,22 @@ class MainWindow(QMainWindow):
 
     def handle_node_click(self, node_item, event):
         """Логика клика по узлу (для перемещения или для создания связи)"""
-        # Если режим "Соединить" включен
         if self.link_action.isChecked():
             if self.first_node_for_link is None:
-                # Выбрали первый узел
+                
                 self.first_node_for_link = node_item
-                node_item.setBrush(QBrush(QColor("#ffaa00"))) # Подсветим оранжевым
+                node_item.setBrush(QBrush(QColor("#ffaa00"))) # Оранжевый (подсветка выбора)
             else:
-                # Выбрали второй узел - создаем связь
+                
                 if self.first_node_for_link != node_item:
                     self.create_link(self.first_node_for_link, node_item)
                 
-                # Сбрасываем выделение
-                self.first_node_for_link.setBrush(QBrush(QColor("#aaddff")))
+                self.first_node_for_link.refresh_color() 
                 self.first_node_for_link = None
-                self.link_action.setChecked(False) # Выключаем режим соединения
+                self.link_action.setChecked(False)
+        
+        # Вызываем стандартное поведение (чтобы круги можно было таскать)
+        GraphNodeItem.mousePressEvent(node_item, event)
         
         # Вызываем стандартное поведение
         GraphNodeItem.mousePressEvent(node_item, event)

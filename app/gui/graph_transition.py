@@ -3,6 +3,8 @@ from PyQt6.QtWidgets import QGraphicsPathItem, QGraphicsRectItem, QGraphicsPolyg
 from PyQt6.QtGui import QPen, QColor, QPainterPath, QPolygonF, QBrush
 from PyQt6.QtCore import QLineF, QPointF, Qt
 
+from .property_dialogs import TransitionPropertiesDialog
+
 class GraphTransitionItem(QGraphicsPathItem):
     """Визуальная стрелка с точкой изгиба"""
     def __init__(self, source_item, target_item, logical_transition):
@@ -69,6 +71,37 @@ class GraphTransitionItem(QGraphicsPathItem):
                                -math.sin(angle - arrow_angle) * arrow_size)
 
         self.arrow_head.setPolygon(QPolygonF([e_point, p3, p4]))
+
+    def mouseDoubleClickEvent(self, event):
+        current_action = self.logical_transition.action
+        current_input = self.logical_transition.properties.get("input_data", "")
+
+        from .property_dialogs import TransitionPropertiesDialog
+        dialog = TransitionPropertiesDialog(current_action, current_input)
+        
+        if dialog.exec():
+            new_action, new_input, now_delete = dialog.get_values()
+            
+            if now_delete:
+                # Удаляем из логики
+                main_window = self.scene().views()[0].window()
+                main_window.graph_model.delete_transition(self.logical_transition.id)
+                
+                # Удаляем из списков узлов
+                if self in self.source_item.transitions:
+                    self.source_item.transitions.remove(self)
+                if self in self.target_item.transitions:
+                    self.target_item.transitions.remove(self)
+                
+                # Удаляем со сцены якорь и саму стрелку
+                if self.anchor.scene():
+                    self.scene().removeItem(self.anchor)
+                self.scene().removeItem(self)
+                return
+
+            # Обновление данных
+            self.logical_transition.action = new_action
+            self.logical_transition.properties["input_data"] = new_input
 
 class TransitionAnchor(QGraphicsRectItem):
     """Точка изгиба"""
