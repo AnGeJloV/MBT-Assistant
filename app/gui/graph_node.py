@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QGraphicsEllipseItem, QGraphicsTextItem
+from PyQt6.QtWidgets import QGraphicsEllipseItem, QGraphicsTextItem, QInputDialog
 from PyQt6.QtGui import QBrush, QColor
 from PyQt6.QtCore import Qt
 
@@ -19,13 +19,33 @@ class GraphNodeItem(QGraphicsEllipseItem):
 
         # Имя поверх кружка
         self.text_item = QGraphicsTextItem(self.logical_node.name, self)
+        self.update_text_position()
 
-        # Центрируем текст внутри кружка
-        text_width = self.text_item.boundingRect().width()
-        text_height = self.text_item.boundingRect().height()
-        rect = self.boundingRect()
+    def update_text_position(self):
+        """Центрирует текст внутри круга"""
+        text_rect = self.text_item.boundingRect()
+        node_rect = self.boundingRect()
         self.text_item.setPos(
-            (rect.width() - text_width) / 2,
-            (rect.height() - text_height) /2
+            (node_rect.width() - text_rect.width()) / 2,
+            (node_rect.height() - text_rect.height()) / 2
         )
+    
+    def mouseDoubleClickEvent(self, event):
+        """Событие двойного клика - меняем имя узла"""
+        # Вызываем стандартное диалоговое окно Python
+        new_name, ok = QInputDialog.getText(
+            None, "Редактирование", "Введите название состояния:",
+            text=self.logical_node.name
+        )
+        
+        # Если пользователь нажал OK и ввел текст
+        if ok and new_name:
+            # Обновляем в логике (в объекте Node)
+            self.logical_node.name = new_name
+            # Обновляем визуально на холсте
+            self.text_item.setPlainText(new_name)
+            # Пересчитываем центр (имя могло стать длиннее)
+            self.update_text_position()
+            
+        super().mouseDoubleClickEvent(event) # Пробрасываем событие дальше по цепочке
 
