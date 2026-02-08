@@ -63,11 +63,12 @@ class TestGenerator:
                 "steps": []
             }
             for step in path:
-                test_case["steps"].append({
+                 test_case["steps"].append({
+                    "from_node": step.source.name,
                     "action": step.action,
                     "input": step.properties.get("input_data", "N/A"),
-                    "expected": step.target.properties.get("expected_result", "N/A"),
-                    "target_node": step.target.name
+                    "to_node": step.target.name,    
+                    "expected": step.target.properties.get("expected_result", "N/A")
                 })
             formatted_tests.append(test_case)
         return formatted_tests

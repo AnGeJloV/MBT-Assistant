@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QMainWindow, QGraphicsView, QGraphicsScene, QToolBar, QMessageBox, QTextEdit, QDialog, QVBoxLayout, QStackedWidget
+from PyQt6.QtWidgets import QMainWindow, QGraphicsView, QGraphicsScene, QToolBar, QMessageBox, QTextEdit, QDialog, QVBoxLayout, QStackedWidget, QFileDialog
 from PyQt6.QtGui import QAction, QBrush, QColor
 from PyQt6.QtCore import Qt
 
@@ -35,37 +35,48 @@ class MainWindow(QMainWindow):
         self.view.setRenderHint(self.view.renderHints().Antialiasing) # Сглаживание
 
         # Страница результатов
-        self.results_page = ResultsView(back_callback=self.show_editor)
+        self.results_page = ResultsView()
 
         # Добавляем страницы в стек
         self.central_stack.addWidget(self.view)         # Индекс 0
         self.central_stack.addWidget(self.results_page)  # Индекс 1
 
-        self.first_node_for_link = None 
+        # Списки для управления видимостью кнопок тулбара
+        self.editor_actions = []
 
         self._create_menus()
         self._create_toolbar()
+        self.show_editor()
 
     def show_editor(self):
         """Переключить на редактор графов"""
         self.central_stack.setCurrentIndex(0)
+        # Показываем кнопки редактора
+        self.toolbar.show()
 
     def show_results(self):
         """Переключить на страницу с таблицей"""
         self.central_stack.setCurrentIndex(1)
+        # Скрываем кнопки редактора
+        self.toolbar.hide()
 
     def _create_menus(self):
         """Создание верхнего меню (Файл, Результаты и т.д.)"""
         menu_bar = self.menuBar()
 
         file_menu = menu_bar.addMenu("Файл")
+        load_json_act = QAction("Загрузить JSON", self)
+        load_json_act.triggered.connect(lambda: print("Загрузка JSON...")) 
+        file_menu.addAction(load_json_act)
+        file_menu.addSeparator()
+
         exit_action = QAction("Выход", self)
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
 
         results_menu = menu_bar.addMenu("Результаты")
         
-        view_results_act = QAction("Посмотреть текущие тесты", self)
+        view_results_act = QAction("Посмотреть таблицу", self)
         view_results_act.triggered.connect(self.show_results)
         results_menu.addAction(view_results_act)
         
@@ -73,25 +84,34 @@ class MainWindow(QMainWindow):
         view_editor_act.triggered.connect(self.show_editor)
         results_menu.addAction(view_editor_act)
 
+        results_menu.addSeparator()
+
+        export_act = QAction("Экспортировать в Excel", self)
+        export_act.triggered.connect(self.results_page.export_to_excel)
+        results_menu.addAction(export_act)
+
     def _create_toolbar(self):
         """Панель инструментов для быстрого доступа"""
-        toolbar = QToolBar("Панель инструментов")
-        self.addToolBar(toolbar)
+        self.toolbar = QToolBar("Панель инструментов")
+        self.addToolBar(self.toolbar)
         
         # Кнопка добавления состояния
         add_state_action = QAction("Добавить состояние", self)
         add_state_action.triggered.connect(self.add_state_node)
-        toolbar.addAction(add_state_action)
+        self.toolbar.addAction(add_state_action)
+        self.editor_actions.append(add_state_action)
 
         # Кнопка для соединения
         self.link_action = QAction("Соединить", self)
         self.link_action.setCheckable(True) # Кнопка-"переключатель"
-        toolbar.addAction(self.link_action)
+        self.toolbar.addAction(self.link_action)
+        self.editor_actions.append(self.link_action)
 
         # Кнопка для генерации тестов
         gen_action = QAction("Генерировать тесты", self)
         gen_action.triggered.connect(self.run_generation)
-        toolbar.addAction(gen_action)
+        self.toolbar.addAction(gen_action)
+        self.editor_actions.append(gen_action)
 
     def add_state_node(self):
         """Метод-обработчик для добавления нового узла-состояния"""
