@@ -1,3 +1,4 @@
+import json
 from PyQt6.QtWidgets import QMainWindow, QGraphicsView, QGraphicsScene, QToolBar, QMessageBox, QTextEdit, QDialog, QVBoxLayout, QStackedWidget, QFileDialog
 from PyQt6.QtGui import QAction, QBrush, QColor
 from PyQt6.QtCore import Qt
@@ -44,6 +45,8 @@ class MainWindow(QMainWindow):
         # Списки для управления видимостью кнопок тулбара
         self.editor_actions = []
 
+        self.first_node_for_link = None 
+
         self._create_menus()
         self._create_toolbar()
         self.show_editor()
@@ -61,13 +64,23 @@ class MainWindow(QMainWindow):
         self.toolbar.hide()
 
     def _create_menus(self):
-        """Создание верхнего меню (Файл, Результаты и т.д.)"""
+        """Создание верхнего меню (Файл, Результаты)"""
         menu_bar = self.menuBar()
 
         file_menu = menu_bar.addMenu("Файл")
-        load_json_act = QAction("Загрузить JSON", self)
-        load_json_act.triggered.connect(lambda: print("Загрузка JSON...")) 
-        file_menu.addAction(load_json_act)
+
+        new_project_act = QAction("Новый проект", self)
+        new_project_act.triggered.connect(self.clear_editor)
+        file_menu.addAction(new_project_act)
+  
+        save_act = QAction("Сохранить проект", self)
+        save_act.triggered.connect(self.save_project)
+        file_menu.addAction(save_act)
+    
+        load_act = QAction("Загрузить проект", self)
+        load_act.triggered.connect(self.load_project)
+        file_menu.addAction(load_act)
+        
         file_menu.addSeparator()
 
         exit_action = QAction("Выход", self)
@@ -216,3 +229,125 @@ class MainWindow(QMainWindow):
         
         layout.addWidget(text_area)
         dialog.exec()
+
+    def save_project(self):
+        """Превращает весь граф в JSON и сохраняет в файл"""
+        file_path, _ = QFileDialog.getSaveFileName(self, "Сохранить проект", "", "JSON Files (*.json)")
+        if not file_path:
+            return
+
+        project_data = {
+            "nodes": [],
+            "transitions": []
+        }
+
+        # Собираем данные об узлах
+        for item in self.scene.items():
+            if isinstance(item, GraphNodeItem):
+                node_data = {
+                    "id": item.logical_node.id,
+                    "name": item.logical_node.name,
+                    "x": item.scenePos().x(),
+                    "y": item.scenePos().y(),
+                    "properties": item.logical_node.properties
+                }
+                project_data["nodes"].append(node_data)
+
+        # Собираем данные о переходах
+        for item in self.scene.items():
+            if isinstance(item, GraphTransitionItem):
+                trans_data = {
+                    "source_id": item.source_item.logical_node.id,
+                    "target_id": item.target_item.logical_node.id,
+                    "action": item.logical_transition.action,
+                    "anchor_x": item.anchor.scenePos().x(),
+                    "anchor_y": item.anchor.scenePos().y(),
+                    "properties": item.logical_transition.properties
+                }
+                project_data["transitions"].append(trans_data)
+
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(project_data, f, ensure_ascii=False, indent=4)
+        
+        QMessageBox.information(self, "Успех", "Проект успешно сохранен!")
+
+    def load_project(self):
+        """Загружает проект из JSON-файла"""
+        file_path, _ = QFileDialog.getOpenFileName(self, "Открыть проект", "", "JSON Files (*.json)")
+        if not file_path:
+            return
+
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            # Очищаем текущий проект
+            self.scene.clear()
+            self.graph_model.clear()
+            
+            # Словарь для быстрого поиска созданных визуальных узлов по их ID
+            id_to_visual_node = {}
+
+            # Восстанавливаем узлы
+            for n_data in data["nodes"]:
+                logical_node = self.graph_model.add_node(n_data["name"])
+                logical_node.id = n_data["id"] # Восстанавливаем оригинальный ID
+                logical_node.properties = n_data["properties"]
+                
+                visual_node = GraphNodeItem(logical_node)
+                visual_node.setPos(n_data["x"], n_data["y"])
+                visual_node.mousePressEvent = lambda event, item=visual_node: self.handle_node_click(item, event)
+                
+                self.scene.addItem(visual_node)
+                visual_node.refresh_color()
+                id_to_visual_node[logical_node.id] = visual_node
+
+            # Восстанавливаем переходы
+            for t_data in data["transitions"]:
+                source_item = id_to_visual_node.get(t_data["source_id"])
+                target_item = id_to_visual_node.get(t_data["target_id"])
+                
+                if source_item and target_item:
+                    # Создаем логический переход
+                    logical_trans = self.graph_model.add_transition(
+                        source_item.logical_node, 
+                        target_item.logical_node, 
+                        t_data["action"]
+                    )
+                    logical_trans.properties = t_data["properties"]
+                    
+                    # Создаем визуальный переход
+                    visual_trans = GraphTransitionItem(source_item, target_item, logical_trans)
+                    self.scene.addItem(visual_trans)
+                    
+                    # Восстанавливаем положение якоря (точки изгиба)
+                    visual_trans.anchor.setPos(t_data["anchor_x"], t_data["anchor_y"])
+                    
+                    # Регистрируем стрелку в узлах
+                    source_item.transitions.append(visual_trans)
+                    target_item.transitions.append(visual_trans)
+
+            QMessageBox.information(self, "Успех", "Проект успешно загружен!")
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить файл:\n{str(e)}")
+
+    def clear_editor(self):
+        """Полностью очищает редактор после подтверждения пользователем"""
+        # Создаем окно вопроса
+        reply = QMessageBox.question(
+            self, 
+            "Подтверждение", 
+            "Вы точно хотите очистить редактор? Все несохраненные данные будут потеряны.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            # Очищаем визуальную часть (сцену)
+            self.scene.clear()
+            # Очищаем логическую часть (модель графа)
+            self.graph_model.clear()
+            # Сбрасываем вспомогательные переменные
+            self.first_node_for_link = None
+            
+            print("Редактор успешно очищен.")
