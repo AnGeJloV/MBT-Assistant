@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QMainWindow, QGraphicsView, QGraphicsScene, QToolBar, QMessageBox, QTextEdit, QDialog, QVBoxLayout
+from PyQt6.QtWidgets import QMainWindow, QGraphicsView, QGraphicsScene, QToolBar, QMessageBox, QTextEdit, QDialog, QVBoxLayout, QStackedWidget
 from PyQt6.QtGui import QAction, QBrush, QColor
 from PyQt6.QtCore import Qt
 
@@ -6,6 +6,7 @@ from ..core.graph import Graph
 from .graph_node import GraphNodeItem
 from .graph_transition import GraphTransitionItem
 from ..core.test_generator import TestGenerator
+from .results_view import ResultsView
 
 class MainWindow(QMainWindow):
     """
@@ -21,6 +22,10 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("MBT-Assistant")
         self.setGeometry(100, 100, 1100, 700)
 
+        # Стек окон
+        self.central_stack = QStackedWidget()
+        self.setCentralWidget(self.central_stack)
+
         # Создание холста для рисования
         self.scene = QGraphicsScene()
         self.scene.setSceneRect(0, 0, 2000, 2000)
@@ -28,12 +33,26 @@ class MainWindow(QMainWindow):
         # Создание "камеры", которая смотрит на холст
         self.view = QGraphicsView(self.scene, self)
         self.view.setRenderHint(self.view.renderHints().Antialiasing) # Сглаживание
-        self.setCentralWidget(self.view)
+
+        # Страница результатов
+        self.results_page = ResultsView(back_callback=self.show_editor)
+
+        # Добавляем страницы в стек
+        self.central_stack.addWidget(self.view)         # Индекс 0
+        self.central_stack.addWidget(self.results_page)  # Индекс 1
 
         self.first_node_for_link = None 
 
         self._create_menus()
         self._create_toolbar()
+
+    def show_editor(self):
+        """Переключить на редактор графов"""
+        self.central_stack.setCurrentIndex(0)
+
+    def show_results(self):
+        """Переключить на страницу с таблицей"""
+        self.central_stack.setCurrentIndex(1)
 
     def _create_menus(self):
         """Создание верхнего меню (Файл, Результаты и т.д.)"""
@@ -44,7 +63,15 @@ class MainWindow(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
 
-        edit_menu = menu_bar.addMenu("Результаты")
+        results_menu = menu_bar.addMenu("Результаты")
+        
+        view_results_act = QAction("Посмотреть текущие тесты", self)
+        view_results_act.triggered.connect(self.show_results)
+        results_menu.addAction(view_results_act)
+        
+        view_editor_act = QAction("Вернуться в редактор", self)
+        view_editor_act.triggered.connect(self.show_editor)
+        results_menu.addAction(view_editor_act)
 
     def _create_toolbar(self):
         """Панель инструментов для быстрого доступа"""
@@ -151,18 +178,11 @@ class MainWindow(QMainWindow):
         paths = generator.generate_all_paths()
         test_cases = generator.format_test_cases(paths)
 
-        # Формируем текст для отображения (временно, пока нет вкладки Результаты)
-        result_text = ""
-        for test in test_cases:
-            result_text += f"=== ТЕСТ-КЕЙС №{test['id']} ===\n"
-            for j, step in enumerate(test['steps']):
-                result_text += f"Шаг {j+1}: {step['action']}\n"
-                result_text += f"   Ввод: {step['input']}\n"
-                result_text += f"   Ожидаемый результат: {step['expected']}\n"
-            result_text += "\n"
-
-        # Показываем результат в простом окне
-        self.show_results_popup(result_text)
+        # Заполняем таблицу данными
+        self.results_page.display_tests(test_cases)
+        
+        # Переключаем экран
+        self.show_results()
 
     def show_results_popup(self, text):
         dialog = QDialog(self)
